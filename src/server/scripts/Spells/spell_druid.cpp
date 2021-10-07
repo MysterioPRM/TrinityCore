@@ -69,7 +69,6 @@ enum DruidSpells
     SPELL_DRUID_FORMS_TRINKET_TREE             = 37342,
     SPELL_DRUID_GALACTIC_GUARDIAN_AURA         = 213708,
     SPELL_DRUID_GORE_PROC                      = 93622,
-    SPELL_DRUID_GROWL                          = 6795,
     SPELL_DRUID_IDOL_OF_FERAL_SHADOWS          = 34241,
     SPELL_DRUID_IDOL_OF_WORSHIP                = 60774,
     SPELL_DRUID_INCARNATION_KING_OF_THE_JUNGLE = 102543,
@@ -119,7 +118,6 @@ class spell_dru_base_transformer : public SpellScript
 {
     PrepareSpellScript(spell_dru_base_transformer);
 
-protected:
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo({ GetShapeshiftFormSpell() });
@@ -137,6 +135,7 @@ protected:
         BeforeCast += SpellCastFn(spell_dru_base_transformer::HandleOnCast);
     }
 
+protected:
     virtual bool ToCatForm() const = 0;
 
     ShapeshiftForm GetShapeshiftForm() const { return ToCatForm() ? FORM_CAT_FORM : FORM_BEAR_FORM; }
@@ -166,32 +165,9 @@ class spell_dru_barkskin : public AuraScript
     }
 };
 
-// 50334 - Berserk
+// 77758 - Berserk
 class spell_dru_berserk : public spell_dru_base_transformer
 {
-    PrepareSpellScript(spell_dru_berserk);
-
-    bool Validate(SpellInfo const* spellInfo) override
-    {
-        if (!spell_dru_base_transformer::Validate(spellInfo))
-            return false;
-
-        return ValidateSpellInfo({ SPELL_DRUID_MANGLE, SPELL_DRUID_THRASH_BEAR, SPELL_DRUID_GROWL });
-    }
-
-    void ResetCooldowns()
-    {
-        GetCaster()->GetSpellHistory()->ResetCooldown(SPELL_DRUID_MANGLE);
-        GetCaster()->GetSpellHistory()->ResetCooldown(SPELL_DRUID_THRASH_BEAR);
-        GetCaster()->GetSpellHistory()->ResetCooldown(SPELL_DRUID_GROWL);
-    }
-
-    void Register() override
-    {
-        spell_dru_base_transformer::Register();
-        AfterCast += SpellCastFn(spell_dru_berserk::ResetCooldowns);
-    }
-
 protected:
     bool ToCatForm() const override { return false; }
 };
@@ -496,7 +472,7 @@ class spell_dru_ferocious_bite : public SpellScript
     bool Validate(SpellInfo const* /*spellInfo*/) override
     {
         return ValidateSpellInfo({ SPELL_DRUID_INCARNATION_KING_OF_THE_JUNGLE  })
-            && sSpellMgr->AssertSpellInfo(SPELL_DRUID_INCARNATION_KING_OF_THE_JUNGLE, DIFFICULTY_NONE)->GetEffects().size() > EFFECT_1;
+            && sSpellMgr->AssertSpellInfo(SPELL_DRUID_INCARNATION_KING_OF_THE_JUNGLE, DIFFICULTY_NONE)->GetEffect(EFFECT_1);
     }
 
     void HandleHitTargetBurn(SpellEffIndex /*effIndex*/)
@@ -733,7 +709,7 @@ public:
                 spellMod->op = SpellModOp::PeriodicHealingAndDamage;
                 spellMod->type = SPELLMOD_FLAT;
                 spellMod->spellId = GetId();
-                spellMod->mask = aurEff->GetSpellEffectInfo().SpellClassMask;
+                spellMod->mask = aurEff->GetSpellEffectInfo()->SpellClassMask;
             }
             spellMod->value = aurEff->GetAmount() / 7;
         }
@@ -890,8 +866,7 @@ public:
                 }
             }
 
-            target->CastSpell(target, SPELL_DRUID_LIFEBLOOM_FINAL_HEAL, CastSpellExtraArgs(aurEff)
-                .SetOriginalCaster(GetCasterGUID()));
+            target->CastSpell(target, SPELL_DRUID_LIFEBLOOM_FINAL_HEAL, { aurEff, GetCasterGUID() });
         }
 
         void AfterRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
@@ -1186,8 +1161,7 @@ public:
         void AfterApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
         {
             Unit* target = GetTarget();
-            target->CastSpell(target, SPELL_DRUID_SAVAGE_ROAR, CastSpellExtraArgs(aurEff)
-                .SetOriginalCaster(GetCasterGUID()));
+            target->CastSpell(target, SPELL_DRUID_SAVAGE_ROAR, { aurEff, GetCasterGUID() });
         }
 
         void AfterRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
@@ -1589,6 +1563,8 @@ public:
 
             ASSERT(spellInfo->GetMaxTicks() > 0);
             amount /= spellInfo->GetMaxTicks();
+            // Add remaining ticks to damage done
+            amount += target->GetRemainingPeriodicAmount(caster->GetGUID(), SPELL_DRUID_LANGUISH, SPELL_AURA_PERIODIC_DAMAGE);
 
             CastSpellExtraArgs args(aurEff);
             args.AddSpellMod(SPELLVALUE_BASE_POINT0, amount);
@@ -1853,7 +1829,7 @@ private:
     {
         SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell_id, difficulty);
 
-        if (requireOutdoors && !targetPlayer->IsOutdoors())
+        if (requireOutdoors && !targetPlayer->GetMap()->IsOutdoors(targetPlayer->GetPhaseShift(), targetPlayer->GetPositionX(), targetPlayer->GetPositionY(), targetPlayer->GetPositionZ()))
             return SPELL_FAILED_ONLY_OUTDOORS;
 
         return spellInfo->CheckLocation(targetPlayer->GetMapId(), targetPlayer->GetZoneId(), targetPlayer->GetAreaId(), targetPlayer);
@@ -1983,7 +1959,8 @@ public:
 
         bool Validate(SpellInfo const* spellInfo) override
         {
-            if (spellInfo->GetEffects().size() <= EFFECT_2 || spellInfo->GetEffect(EFFECT_2).IsEffect() || spellInfo->GetEffect(EFFECT_2).CalcValue() <= 0)
+            SpellEffectInfo const* effect2 = spellInfo->GetEffect(EFFECT_2);
+            if (!effect2 || effect2->IsEffect() || effect2->CalcValue() <= 0)
                 return false;
             return true;
         }
@@ -1992,7 +1969,7 @@ public:
         {
             targets.remove_if(RaidCheck(GetCaster()));
 
-            uint32 const maxTargets = uint32(GetEffectInfo(EFFECT_2).CalcValue(GetCaster()));
+            uint32 const maxTargets = uint32(GetSpellInfo()->GetEffect(EFFECT_2)->CalcValue(GetCaster()));
 
             if (targets.size() > maxTargets)
             {
@@ -2033,7 +2010,7 @@ public:
                 return;
 
             // calculate from base damage, not from aurEff->GetAmount() (already modified)
-            float damage = caster->CalculateSpellDamage(GetUnitOwner(), aurEff->GetSpellEffectInfo());
+            float damage = caster->CalculateSpellDamage(GetUnitOwner(), GetSpellInfo(), aurEff->GetEffIndex());
 
             // Wild Growth = first tick gains a 6% bonus, reduced by 2% each tick
             float reduction = 2.f;

@@ -351,14 +351,12 @@ class boss_algalon_the_observer : public CreatureScript
                         me->SetDisableGravity(true);
                         DoCast(me, SPELL_ARRIVAL, true);
                         DoCast(me, SPELL_RIDE_THE_LIGHTNING, true);
-
+                        me->GetMotionMaster()->MovePoint(POINT_ALGALON_LAND, AlgalonLandPos);
                         me->SetHomePosition(AlgalonLandPos);
-
                         Movement::MoveSplineInit init(me);
                         init.MoveTo(AlgalonLandPos.GetPositionX(), AlgalonLandPos.GetPositionY(), AlgalonLandPos.GetPositionZ(), false);
                         init.SetOrientationFixed(true);
-                        me->GetMotionMaster()->LaunchMoveSpline(std::move(init), POINT_ALGALON_LAND, MOTION_PRIORITY_NORMAL, POINT_MOTION_TYPE);
-
+                        init.Launch();
                         events.Reset();
                         events.SetPhase(PHASE_ROLE_PLAY);
                         events.ScheduleEvent(EVENT_INTRO_1, 5000, 0, PHASE_ROLE_PLAY);
@@ -396,7 +394,7 @@ class boss_algalon_the_observer : public CreatureScript
                 return type == DATA_HAS_FED_ON_TEARS ? _fedOnTears : 1;
             }
 
-            void JustEngagedWith(Unit* /*target*/) override
+            void EnterCombat(Unit* /*target*/) override
             {
                 uint32 introDelay = 0;
                 me->AddUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
@@ -407,7 +405,7 @@ class boss_algalon_the_observer : public CreatureScript
                 if (!_firstPull)
                 {
                     Talk(SAY_ALGALON_AGGRO);
-                    _JustEngagedWith();
+                    _EnterCombat();
                     introDelay = 8000;
                 }
                 else
@@ -418,7 +416,6 @@ class boss_algalon_the_observer : public CreatureScript
                         brann->AI()->DoAction(ACTION_FINISH_INTRO);
 
                     me->setActive(true);
-                    me->SetFarVisible(true);
                     DoZoneInCombat();
                     introDelay = 26000;
                     summons.DespawnEntry(NPC_AZEROTH);
@@ -789,7 +786,7 @@ class npc_living_constellation : public CreatureScript
 
                 me->DespawnOrUnsummon(1);
                 if (InstanceScript* instance = me->GetInstanceScript())
-                    instance->DoStartCriteriaTimer(CriteriaStartEvent::SendEvent, EVENT_ID_SUPERMASSIVE_START);
+                    instance->DoStartCriteriaTimer(CRITERIA_TIMED_TYPE_EVENT, EVENT_ID_SUPERMASSIVE_START);
                 caster->CastSpell(nullptr, SPELL_BLACK_HOLE_CREDIT, TRIGGERED_FULL_MASK);
                 caster->ToCreature()->DespawnOrUnsummon(1);
             }
@@ -993,7 +990,7 @@ class go_celestial_planetarium_access : public GameObjectScript
 
             InstanceScript* instance;
 
-            bool OnReportUse(Player* player) override
+            bool GossipHello(Player* player) override
             {
                 if (me->HasFlag(GO_FLAG_IN_USE))
                     return true;
@@ -1199,7 +1196,7 @@ class spell_algalon_collapse : public SpellScriptLoader
             void HandlePeriodic(AuraEffect const* /*aurEff*/)
             {
                 PreventDefaultAction();
-                Unit::DealDamage(GetTarget(), GetTarget(), GetTarget()->CountPctFromMaxHealth(1), nullptr, NODAMAGE);
+                GetTarget()->DealDamage(GetTarget(), GetTarget()->CountPctFromMaxHealth(1), nullptr, NODAMAGE);
             }
 
             void Register() override
@@ -1361,7 +1358,7 @@ class spell_algalon_supermassive_fail : public SpellScriptLoader
                 if (!GetHitPlayer())
                     return;
 
-                GetHitPlayer()->ResetCriteria(CriteriaFailEvent::BeSpellTarget, GetSpellInfo()->Id, true);
+                GetHitPlayer()->ResetCriteria(CRITERIA_CONDITION_NO_SPELL_HIT, GetSpellInfo()->Id, true);
             }
 
             void Register() override

@@ -95,7 +95,7 @@ public:
             return false;
 
         uint32 scenePackageId = atoi(scenePackageIdStr);
-        EnumFlag<SceneFlag> flags = flagsStr ? static_cast<SceneFlag>(atoi(flagsStr)) : SceneFlag::None;
+        uint32 flags = flagsStr ? atoi(flagsStr) : SCENEFLAG_UNK16;
         Player* target = handler->getSelectedPlayerOrSelf();
 
         if (!target)

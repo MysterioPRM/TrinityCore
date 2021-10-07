@@ -81,9 +81,9 @@ struct boss_supremus : public BossAI
         _DespawnAtEvade();
     }
 
-    void JustEngagedWith(Unit* /*who*/) override
+    void EnterCombat(Unit* /*who*/) override
     {
-        _JustEngagedWith();
+        _EnterCombat();
         ChangePhase();
         events.ScheduleEvent(EVENT_BERSERK, Minutes(15));
         events.ScheduleEvent(EVENT_FLAME, Seconds(20));
@@ -183,7 +183,7 @@ struct npc_molten_flame : public NullCreatureAI
     void InitializeAI() override
     {
         float x, y, z;
-        me->GetNearPoint(me, x, y, z, 100.0f, frand(0.f, 2.f * float(M_PI)));
+        me->GetNearPoint(me, x, y, z, 1, 100.0f, frand(0.f, 2.f * float(M_PI)));
         me->GetMotionMaster()->MovePoint(0, x, y, z);
         DoCastSelf(SPELL_MOLTEN_FLAME, true);
     }

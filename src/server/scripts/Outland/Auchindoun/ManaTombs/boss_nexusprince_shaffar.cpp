@@ -105,10 +105,10 @@ class boss_nexusprince_shaffar : public CreatureScript
                 }
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
-                _JustEngagedWith();
+                _EnterCombat();
 
                 events.ScheduleEvent(EVENT_BEACON, 10000);
                 events.ScheduleEvent(EVENT_FIREBALL, 8000);
@@ -151,7 +151,8 @@ class boss_nexusprince_shaffar : public CreatureScript
 
                         // expire movement, will prevent from running right back to victim after cast
                         // (but should MoveChase be used again at a certain time or should he not move?)
-                        me->GetMotionMaster()->Clear(MOTION_PRIORITY_NORMAL);
+                        if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
+                            me->GetMotionMaster()->MovementExpired();
 
                         DoCast(me, SPELL_BLINK);
                         break;
@@ -210,7 +211,7 @@ class npc_ethereal_beacon : public CreatureScript
                 _events.Reset();
             }
 
-            void JustEngagedWith(Unit* who) override
+            void EnterCombat(Unit* who) override
             {
                 if (Creature* shaffar = me->FindNearestCreature(NPC_SHAFFAR, 100.0f))
                     if (!shaffar->IsInCombat())
@@ -285,7 +286,7 @@ class npc_ethereal_apprentice : public CreatureScript
                 _events.Reset();
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
                 _events.ScheduleEvent(EVENT_ETHEREAL_APPRENTICE_FIREBOLT, 3000);
             }
@@ -345,7 +346,7 @@ public:
 
         void Reset() override { }
 
-        void JustEngagedWith(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/) override
         {
             _events.ScheduleEvent(EVENT_DOUBLE_BREATH, urand(6000,9000));
         }

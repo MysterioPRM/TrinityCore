@@ -203,7 +203,7 @@ class boss_xt002 : public CreatureScript
 
                 Initialize();
 
-                instance->DoStopCriteriaTimer(CriteriaStartEvent::SendEvent, ACHIEV_MUST_DECONSTRUCT_FASTER);
+                instance->DoStopCriteriaTimer(CRITERIA_TIMED_TYPE_EVENT, ACHIEV_MUST_DECONSTRUCT_FASTER);
             }
 
             void EnterEvadeMode(EvadeReason /*why*/) override
@@ -212,10 +212,10 @@ class boss_xt002 : public CreatureScript
                 _DespawnAtEvade();
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
-                _JustEngagedWith();
+                _EnterCombat();
 
                 events.ScheduleEvent(EVENT_ENRAGE, TIMER_ENRAGE);
                 events.ScheduleEvent(EVENT_GRAVITY_BOMB, TIMER_GRAVITY_BOMB);
@@ -223,7 +223,7 @@ class boss_xt002 : public CreatureScript
                 //Tantrum is cast a bit slower the first time.
                 events.ScheduleEvent(EVENT_TYMPANIC_TANTRUM, urand(TIMER_TYMPANIC_TANTRUM_MIN, TIMER_TYMPANIC_TANTRUM_MAX) * 2);
 
-                instance->DoStartCriteriaTimer(CriteriaStartEvent::SendEvent, ACHIEV_MUST_DECONSTRUCT_FASTER);
+                instance->DoStartCriteriaTimer(CRITERIA_TIMED_TYPE_EVENT, ACHIEV_MUST_DECONSTRUCT_FASTER);
             }
 
             void DoAction(int32 action) override
@@ -631,6 +631,29 @@ class npc_pummeller : public CreatureScript
  *        XE-321 BOOMBOT
  *
  *///----------------------------------------------------
+class BoomEvent : public BasicEvent
+{
+    public:
+        BoomEvent(Creature* me) : _me(me)
+        {
+        }
+
+        bool Execute(uint64 /*time*/, uint32 /*diff*/) override
+        {
+            // This hack is here because we suspect our implementation of spell effect execution on targets
+            // is done in the wrong order. We suspect that EFFECT_0 needs to be applied on all targets,
+            // then EFFECT_1, etc - instead of applying each effect on target1, then target2, etc.
+            // The above situation causes the visual for this spell to be bugged, so we remove the instakill
+            // effect and implement a script hack for that.
+
+            _me->CastSpell(_me, SPELL_BOOM, false);
+            return true;
+        }
+
+    private:
+        Creature* _me;
+};
+
 class npc_boombot : public CreatureScript
 {
     public:
@@ -672,11 +695,16 @@ class npc_boombot : public CreatureScript
                     instakill.SpellID = SPELL_BOOM;
                     me->SendMessageToSet(instakill.Write(), false);
 
-                    me->KillSelf();
+                    me->DealDamage(me, me->GetHealth(), nullptr, NODAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
 
                     damage = 0;
 
-                    DoCastAOE(SPELL_BOOM);
+                    // Visual only seems to work if the instant kill event is delayed or the spell itself is delayed
+                    // Casting done from player and caster source has the same targetinfo flags,
+                    // so that can't be the issue
+                    // See BoomEvent class
+                    // Schedule 1s delayed
+                    me->m_Events.AddEvent(new BoomEvent(me), me->m_Events.CalculateTime(1*IN_MILLISECONDS));
                 }
             }
 
@@ -721,7 +749,7 @@ class npc_life_spark : public CreatureScript
                 _scheduler.CancelAll();
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
                 DoCastSelf(SPELL_STATIC_CHARGED);
                 _scheduler.Schedule(Seconds(12), [this](TaskContext spellShock)
@@ -933,8 +961,7 @@ class spell_xt002_heart_overload_periodic : public SpellScriptLoader
                             {
                                 uint8 a = urand(0, 4);
                                 uint32 spellId = spells[a];
-                                toyPile->CastSpell(toyPile, spellId, CastSpellExtraArgs(TRIGGERED_FULL_MASK)
-                                    .SetOriginalCaster(instance->GetGuidData(BOSS_XT002)));
+                                toyPile->CastSpell(toyPile, spellId, true, nullptr, nullptr, instance->GetGuidData(BOSS_XT002));
                             }
                         }
                     }

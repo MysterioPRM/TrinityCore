@@ -270,25 +270,27 @@ class spell_warl_devour_magic : public SpellScriptLoader
         {
             PrepareSpellScript(spell_warl_devour_magic_SpellScript);
 
-            bool Validate(SpellInfo const* spellInfo) override
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
-                return ValidateSpellInfo({ SPELL_WARLOCK_GLYPH_OF_DEMON_TRAINING, SPELL_WARLOCK_DEVOUR_MAGIC_HEAL })
-                    && spellInfo->GetEffects().size() > EFFECT_1;
+                return ValidateSpellInfo({ SPELL_WARLOCK_GLYPH_OF_DEMON_TRAINING, SPELL_WARLOCK_DEVOUR_MAGIC_HEAL });
             }
 
             void OnSuccessfulDispel(SpellEffIndex /*effIndex*/)
             {
-                Unit* caster = GetCaster();
-                CastSpellExtraArgs args;
-                args.TriggerFlags = TRIGGERED_FULL_MASK;
-                args.AddSpellBP0(GetEffectInfo(EFFECT_1).CalcValue(caster));
+                if (SpellEffectInfo const* effect = GetSpellInfo()->GetEffect(EFFECT_1))
+                {
+                    Unit* caster = GetCaster();
+                    CastSpellExtraArgs args;
+                    args.TriggerFlags = TRIGGERED_FULL_MASK;
+                    args.AddSpellBP0(effect->CalcValue(caster));
 
-                caster->CastSpell(caster, SPELL_WARLOCK_DEVOUR_MAGIC_HEAL, args);
+                    caster->CastSpell(caster, SPELL_WARLOCK_DEVOUR_MAGIC_HEAL, args);
 
-                // Glyph of Felhunter
-                if (Unit* owner = caster->GetOwner())
-                    if (owner->GetAura(SPELL_WARLOCK_GLYPH_OF_DEMON_TRAINING))
-                        owner->CastSpell(owner, SPELL_WARLOCK_DEVOUR_MAGIC_HEAL, args);
+                    // Glyph of Felhunter
+                    if (Unit* owner = caster->GetOwner())
+                        if (owner->GetAura(SPELL_WARLOCK_GLYPH_OF_DEMON_TRAINING))
+                            owner->CastSpell(owner, SPELL_WARLOCK_DEVOUR_MAGIC_HEAL, args);
+                }
             }
 
             void Register() override
@@ -375,7 +377,7 @@ class spell_warl_health_funnel : public SpellScriptLoader
                 if (Player* modOwner = caster->GetSpellModOwner())
                     modOwner->ApplySpellMod(GetSpellInfo(), SpellModOp::PowerCost0, damage);
 
-                SpellNonMeleeDamage damageInfo(caster, caster, GetSpellInfo(), GetAura()->GetSpellVisual(), GetSpellInfo()->SchoolMask, GetAura()->GetCastId());
+                SpellNonMeleeDamage damageInfo(caster, caster, GetSpellInfo(), GetAura()->GetSpellVisual(), GetSpellInfo()->SchoolMask, GetAura()->GetCastGUID());
                 damageInfo.periodicLog = true;
                 damageInfo.damage = damage;
                 caster->DealSpellDamage(&damageInfo, false);
@@ -515,7 +517,7 @@ class spell_warl_seed_of_corruption_dummy : public SpellScriptLoader
                 if (!caster)
                     return;
 
-                amount = caster->SpellBaseDamageBonusDone(GetSpellInfo()->GetSchoolMask()) * GetEffectInfo(EFFECT_0).CalcValue(caster) / 100;
+                amount = caster->SpellBaseDamageBonusDone(GetSpellInfo()->GetSchoolMask()) * ASSERT_NOTNULL(GetSpellInfo()->GetEffect(EFFECT_0))->CalcValue(caster) / 100;
             }
 
             void HandleProc(AuraEffect* aurEff, ProcEventInfo& eventInfo)
@@ -709,7 +711,7 @@ class spell_warl_soul_swap_dot_marker : public SpellScriptLoader
                 if (!swapSpellScript)
                     return;
 
-                flag128 classMask = GetEffectInfo().SpellClassMask;
+                flag128 classMask = GetEffectInfo()->SpellClassMask;
 
                 for (Unit::AuraApplicationMap::const_iterator itr = appliedAuras.begin(); itr != appliedAuras.end(); ++itr)
                 {
@@ -905,17 +907,15 @@ class spell_warl_unstable_affliction : public SpellScriptLoader
                 {
                     if (AuraEffect const* aurEff = GetEffect(EFFECT_1))
                     {
-                        if (Unit* target = dispelInfo->GetDispeller()->ToUnit())
-                        {
-                            int32 bp = aurEff->GetAmount();
-                            bp = target->SpellDamageBonusTaken(caster, aurEff->GetSpellInfo(), bp, DOT);
-                            bp *= 9;
+                        Unit* target = dispelInfo->GetDispeller();
+                        int32 bp = aurEff->GetAmount();
+                        bp = target->SpellDamageBonusTaken(caster, aurEff->GetSpellInfo(), bp, DOT);
+                        bp *= 9;
 
-                            // backfire damage and silence
-                            CastSpellExtraArgs args(aurEff);
-                            args.AddSpellBP0(bp);
-                            caster->CastSpell(target, SPELL_WARLOCK_UNSTABLE_AFFLICTION_DISPEL, args);
-                        }
+                        // backfire damage and silence
+                        CastSpellExtraArgs args(aurEff);
+                        args.AddSpellBP0(bp);
+                        caster->CastSpell(target, SPELL_WARLOCK_UNSTABLE_AFFLICTION_DISPEL, args);
                     }
                 }
             }

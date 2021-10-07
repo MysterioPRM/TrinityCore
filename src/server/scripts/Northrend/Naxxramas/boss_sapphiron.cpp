@@ -175,9 +175,9 @@ class boss_sapphiron : public CreatureScript
                 damage = me->GetHealth()-1; // don't die during air phase
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
-                _JustEngagedWith();
+                _EnterCombat();
 
                 me->CastSpell(me, SPELL_FROST_AURA, true);
 
@@ -299,7 +299,10 @@ class boss_sapphiron : public CreatureScript
                                 events.ScheduleEvent(EVENT_TAIL, randtime(Seconds(7), Seconds(10)), 0, PHASE_GROUND);
                                 return;
                             case EVENT_DRAIN:
-                                CastDrain();
+                                if (events.IsInPhase(PHASE_FLIGHT))
+                                    _delayedDrain = true;
+                                else
+                                    CastDrain();
                                 return;
                             case EVENT_BLIZZARD:
                                 DoCastAOE(SPELL_SUMMON_BLIZZARD);
@@ -400,9 +403,6 @@ class boss_sapphiron : public CreatureScript
                                 me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                                 me->SetReactState(REACT_AGGRESSIVE);
                                 return;
-                            case EVENT_DRAIN:
-                                _delayedDrain = true;
-                                break;
                         }
                     }
                 }
@@ -440,9 +440,9 @@ struct npc_sapphiron_blizzard : public ScriptedAI
         return data == DATA_BLIZZARD_TARGET ? _targetGuid : ObjectGuid::Empty;
     }
 
-    void SetGUID(ObjectGuid const& guid, int32 id) override
+    void SetGUID(ObjectGuid guid, int32 data)  override
     {
-        if (id == DATA_BLIZZARD_TARGET)
+        if (data == DATA_BLIZZARD_TARGET)
             _targetGuid = guid;
     }
 

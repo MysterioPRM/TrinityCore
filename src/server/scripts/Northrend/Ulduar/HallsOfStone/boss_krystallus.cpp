@@ -63,10 +63,10 @@ class boss_krystallus : public CreatureScript
                 _Reset();
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
-                _JustEngagedWith();
+                _EnterCombat();
 
                 events.ScheduleEvent(EVENT_BOULDER_TOSS, urand(3000, 9000));
                 events.ScheduleEvent(EVENT_GROUND_SLAM, urand(15000, 18000));
@@ -181,17 +181,12 @@ class spell_krystallus_shatter_effect : public SpellScriptLoader
         {
             PrepareSpellScript(spell_krystallus_shatter_effect_SpellScript);
 
-            bool Validate(SpellInfo const* spellInfo) override
-            {
-                return !spellInfo->GetEffects().empty();
-            }
-
             void CalculateDamage()
             {
                 if (!GetHitUnit())
                     return;
 
-                float radius = GetSpellInfo()->GetEffect(EFFECT_0).CalcRadius(GetCaster());
+                float radius = GetSpellInfo()->GetEffect(EFFECT_0)->CalcRadius(GetCaster());
                 if (!radius)
                     return;
 

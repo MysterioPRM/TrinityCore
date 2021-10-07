@@ -195,7 +195,7 @@ public:
             {
                 damage = 0;
                 EnterEvadeMode();
-                me->SetFaction(FACTION_FRIENDLY);
+                me->SetFaction(35);
                 bDone = true;
             }
         }
@@ -323,7 +323,7 @@ public:
             {
                 damage = 0;
                 EnterEvadeMode();
-                me->SetFaction(FACTION_FRIENDLY);
+                me->SetFaction(35);
                 bDone = true;
             }
         }
@@ -668,8 +668,7 @@ class spell_paletress_summon_memory : public SpellScriptLoader
 
             void HandleScript(SpellEffIndex /*effIndex*/)
             {
-                GetHitUnit()->CastSpell(GetHitUnit(), memorySpellId[urand(0, 24)], CastSpellExtraArgs(TRIGGERED_FULL_MASK)
-                    .SetOriginalCaster(GetCaster()->GetGUID()));
+                GetHitUnit()->CastSpell(GetHitUnit(), memorySpellId[urand(0, 24)], true, nullptr, nullptr, GetCaster()->GetGUID());
             }
 
             void Register() override

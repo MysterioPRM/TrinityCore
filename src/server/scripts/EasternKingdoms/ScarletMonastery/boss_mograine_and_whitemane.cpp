@@ -115,7 +115,7 @@ public:
                 instance->SetBossState(DATA_MOGRAINE_AND_WHITE_EVENT, FAIL);
         }
 
-        void JustEngagedWith(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_MO_AGGRO);
             DoCast(me, SPELL_RETRIBUTIONAURA);
@@ -128,19 +128,19 @@ public:
             Talk(SAY_MO_KILL);
         }
 
-        void DamageTaken(Unit* /*doneBy*/, uint32& damage) override
+        void DamageTaken(Unit* /*doneBy*/, uint32 &damage) override
         {
-            if (damage <= me->GetHealth() || _bHasDied || _bFakeDeath)
+            if (damage < me->GetHealth() || _bHasDied || _bFakeDeath)
                 return;
 
-            // On first death, fake death and open door, as well as initiate whitemane if exist
+            //On first death, fake death and open door, as well as initiate whitemane if exist
             if (Unit* Whitemane = ObjectAccessor::GetUnit(*me, instance->GetGuidData(DATA_WHITEMANE)))
             {
                 instance->SetBossState(DATA_MOGRAINE_AND_WHITE_EVENT, IN_PROGRESS);
 
                 Whitemane->GetMotionMaster()->MovePoint(1, 1163.113370f, 1398.856812f, 32.527786f);
 
-                me->GetMotionMaster()->Clear();
+                me->GetMotionMaster()->MovementExpired();
                 me->GetMotionMaster()->MoveIdle();
 
                 me->SetHealth(0);
@@ -277,7 +277,7 @@ public:
             ScriptedAI::AttackStart(who);
         }
 
-        void JustEngagedWith(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_WH_INTRO);
         }

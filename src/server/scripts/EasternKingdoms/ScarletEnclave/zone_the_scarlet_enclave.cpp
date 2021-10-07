@@ -69,7 +69,6 @@ public:
         void Reset() override
         {
             me->setActive(true);
-            me->SetFarVisible(true);
             me->SetVisible(false);
             me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->SetCanFly(true);
@@ -78,7 +77,7 @@ public:
             z += 4.0f;
             x -= 3.5f;
             y -= 5.0f;
-            me->GetMotionMaster()->Clear();
+            me->GetMotionMaster()->Clear(false);
             me->UpdatePosition(x, y, z, 0.0f);
         }
 

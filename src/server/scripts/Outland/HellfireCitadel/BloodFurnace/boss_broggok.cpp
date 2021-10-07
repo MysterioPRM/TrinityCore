@@ -61,9 +61,9 @@ class boss_broggok : public CreatureScript
                 DoAction(ACTION_RESET_BROGGOK);
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
-                _JustEngagedWith();
+                _EnterCombat();
                 Talk(SAY_AGGRO);
             }
 
@@ -103,7 +103,7 @@ class boss_broggok : public CreatureScript
                 switch (action)
                 {
                     case ACTION_PREPARE_BROGGOK:
-                        DoZoneInCombat();
+                        me->SetInCombatWithZone();
                         break;
                     case ACTION_ACTIVATE_BROGGOK:
                         me->SetReactState(REACT_AGGRESSIVE);
@@ -171,18 +171,17 @@ class spell_broggok_poison_cloud : public SpellScriptLoader
 
             bool Validate(SpellInfo const* spellInfo) override
             {
-                return !spellInfo->GetEffects().empty() && ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_0).TriggerSpell });
+                SpellEffectInfo const* effect0 = spellInfo->GetEffect(EFFECT_0);
+                return effect0 && ValidateSpellInfo({ effect0->TriggerSpell });
             }
 
             void PeriodicTick(AuraEffect const* aurEff)
             {
                 PreventDefaultAction();
-                if (!aurEff->GetTotalTicks())
-                    return;
 
-                uint32 triggerSpell = aurEff->GetSpellEffectInfo().TriggerSpell;
+                uint32 triggerSpell = GetSpellInfo()->GetEffect(aurEff->GetEffIndex())->TriggerSpell;
                 int32 mod = int32(((float(aurEff->GetTickNumber()) / aurEff->GetTotalTicks()) * 0.9f + 0.1f) * 10000 * 2 / 3);
-                GetTarget()->CastSpell(nullptr, triggerSpell, CastSpellExtraArgs(aurEff).AddSpellMod(SPELLVALUE_RADIUS_MOD, mod));
+                GetTarget()->CastCustomSpell(triggerSpell, SPELLVALUE_RADIUS_MOD, mod, nullptr, TRIGGERED_FULL_MASK, nullptr, aurEff);
             }
 
             void Register() override

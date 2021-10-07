@@ -287,6 +287,9 @@ public:
                         {
                             if (GameObject* go = unit->FindNearestGameObject(GO_CARCASS, 10))
                             {
+                                if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
+                                    me->GetMotionMaster()->MovementExpired();
+
                                 me->GetMotionMaster()->MoveIdle();
                                 me->StopMoving();
 
@@ -325,9 +328,7 @@ public:
             {
                 DoCastVictim(SPELL_NETHER_BREATH);
                 CastTimer = 5000;
-            }
-            else
-                CastTimer -= diff;
+            } else CastTimer -= diff;
 
             DoMeleeAttackIfReady();
         }
@@ -551,7 +552,7 @@ public:
                             player->KilledMonsterCredit(23209);
                     }
                     PoisonTimer = 0;
-                    me->KillSelf();
+                    me->DealDamage(me, me->GetHealth(), nullptr, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
                 } else PoisonTimer -= diff;
             }
             if (!UpdateVictim())
@@ -685,7 +686,7 @@ public:
             DoSummon(NPC_COILSKAR_ASSASSIN, me, 15.0f, 5000, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT);
         }
 
-        void JustEngagedWith(Unit* who) override
+        void EnterCombat(Unit* who) override
         {
             //don't always use
             if (rand32() % 5)
@@ -877,7 +878,7 @@ public:
             me->SetTarget(ObjectGuid::Empty);
         }
 
-        void JustEngagedWith(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) override { }
 
         void HandleAnimation()
         {
@@ -971,9 +972,6 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            if (!killer)
-                return;
-
             switch (killer->GetTypeId())
             {
                 case TYPEID_UNIT:
@@ -1049,7 +1047,7 @@ public:
             me->SetVisible(false);
         }
 
-        void JustEngagedWith(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) override { }
         void MoveInLineOfSight(Unit* /*who*/) override { }
 
         void AttackStart(Unit* /*who*/) override { }
@@ -1184,7 +1182,7 @@ public:
             Initialize();
         }
 
-        void JustEngagedWith(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) override { }
 
         void JustDied(Unit* /*killer*/) override
         {
@@ -1454,7 +1452,7 @@ public:
 
         void Reset() override { }
 
-        void JustEngagedWith(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/) override
         {
             switch (me->GetEntry())
             {

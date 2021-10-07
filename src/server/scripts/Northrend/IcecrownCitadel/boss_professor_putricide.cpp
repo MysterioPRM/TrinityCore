@@ -242,6 +242,8 @@ class boss_professor_putricide : public CreatureScript
                 _experimentState = EXPERIMENT_STATE_OOZE;
                 me->SetReactState(REACT_DEFENSIVE);
                 me->SetWalk(false);
+                if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE)
+                    me->GetMotionMaster()->MovementExpired();
 
                 if (instance->GetBossState(DATA_ROTFACE) == DONE && instance->GetBossState(DATA_FESTERGUT) == DONE)
                 {
@@ -250,7 +252,7 @@ class boss_professor_putricide : public CreatureScript
                 }
             }
 
-            void JustEngagedWith(Unit* who) override
+            void EnterCombat(Unit* who) override
             {
                 if (events.IsInPhase(PHASE_ROTFACE) || events.IsInPhase(PHASE_FESTERGUT))
                     return;
@@ -378,7 +380,7 @@ class boss_professor_putricide : public CreatureScript
                         me->SetSpeedRate(MOVE_RUN, _baseSpeed);
                         DoAction(ACTION_FESTERGUT_GAS);
                         if (Creature* festergut = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_FESTERGUT)))
-                            festergut->CastSpell(festergut, SPELL_GASEOUS_BLIGHT_LARGE, CastSpellExtraArgs().SetOriginalCaster(festergut->GetGUID()));
+                            festergut->CastSpell(festergut, SPELL_GASEOUS_BLIGHT_LARGE, false, nullptr, nullptr, festergut->GetGUID());
                         break;
                     case POINT_ROTFACE:
                         instance->SetBossState(DATA_ROTFACE, IN_PROGRESS);   // needed here for delayed gate close
@@ -475,8 +477,7 @@ class boss_professor_putricide : public CreatureScript
                     case ACTION_ROTFACE_OOZE:
                         Talk(SAY_ROTFACE_OOZE_FLOOD);
                         if (Creature* dummy = ObjectAccessor::GetCreature(*me, _oozeFloodDummyGUIDs[_oozeFloodStage]))
-                            dummy->CastSpell(dummy, oozeFloodSpells[_oozeFloodStage], CastSpellExtraArgs(TRIGGERED_FULL_MASK)
-                                .SetOriginalCaster(me->GetGUID())); // cast from self for LoS (with prof's GUID for logs)
+                            dummy->CastSpell(dummy, oozeFloodSpells[_oozeFloodStage], true, nullptr, nullptr, me->GetGUID()); // cast from self for LoS (with prof's GUID for logs)
                         if (++_oozeFloodStage == 4)
                             _oozeFloodStage = 0;
                         break;
@@ -585,7 +586,7 @@ class boss_professor_putricide : public CreatureScript
                             EnterEvadeMode();
                             break;
                         case EVENT_FESTERGUT_GOO:
-                            DoCastAOE(SPELL_MALLEABLE_GOO_SUMMON, CastSpellExtraArgs(true).AddSpellMod(SPELLVALUE_MAX_TARGETS, 1));
+                            me->CastCustomSpell(SPELL_MALLEABLE_GOO_SUMMON, SPELLVALUE_MAX_TARGETS, 1, nullptr, true);
                             events.ScheduleEvent(EVENT_FESTERGUT_GOO, (Is25ManRaid() ? 10000 : 30000) + urand(0, 5000), 0, PHASE_FESTERGUT);
                             break;
                         case EVENT_ROTFACE_DIES:
@@ -739,7 +740,7 @@ class npc_putricide_oozeAI : public ScriptedAI
             if (_instance->GetBossState(DATA_PROFESSOR_PUTRICIDE) != IN_PROGRESS)
                 me->DespawnOrUnsummon();
 
-            DoZoneInCombat();
+            me->SetInCombatWithZone();
             DoCastAOE(_auraSpellId, true);
         }
 
@@ -818,9 +819,7 @@ class npc_gas_cloud : public CreatureScript
 
             void CastMainSpell() override
             {
-                CastSpellExtraArgs args;
-                args.AddSpellMod(SPELLVALUE_AURA_STACK, 10);
-                me->CastSpell(me, SPELL_GASEOUS_BLOAT, args);
+                me->CastCustomSpell(SPELL_GASEOUS_BLOAT, SPELLVALUE_AURA_STACK, 10, me, false);
             }
 
         private:
@@ -849,11 +848,7 @@ class spell_putricide_gaseous_bloat : public SpellScriptLoader
                 {
                     target->RemoveAuraFromStack(GetSpellInfo()->Id, GetCasterGUID());
                     if (!target->HasAura(GetId()))
-                    {
-                        CastSpellExtraArgs args;
-                        args.AddSpellMod(SPELLVALUE_AURA_STACK, 10);
-                        caster->CastSpell(caster, SPELL_GASEOUS_BLOAT, args);
-                    }
+                        caster->CastCustomSpell(SPELL_GASEOUS_BLOAT, SPELLVALUE_AURA_STACK, 10, caster, false);
                 }
             }
 
@@ -867,9 +862,7 @@ class spell_putricide_gaseous_bloat : public SpellScriptLoader
                 for (uint8 i = 1; i <= stack; ++i)
                     dmg += mod * i;
 
-                CastSpellExtraArgs args;
-                args.AddSpellBP0(dmg);
-                caster->CastSpell(nullptr, SPELL_EXPUNGED_GAS, args);
+                caster->CastCustomSpell(SPELL_EXPUNGED_GAS, SPELLVALUE_BASE_POINT0, dmg);
             }
 
             void Register() override
@@ -1056,7 +1049,7 @@ class spell_putricide_unstable_experiment : public SpellScriptLoader
                         break;
                 }
 
-                GetCaster()->CastSpell(target, uint32(GetEffectInfo(SpellEffIndex(stage)).CalcValue()), true);
+                GetCaster()->CastSpell(target, uint32(GetSpellInfo()->GetEffect(stage)->CalcValue()), true);
             }
 
             void Register() override
@@ -1113,8 +1106,9 @@ class spell_putricide_ooze_tank_protection : public SpellScriptLoader
 
             bool Validate(SpellInfo const* spellInfo) override
             {
-                return spellInfo->GetEffects().size() > EFFECT_1
-                    && ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_0).TriggerSpell, spellInfo->GetEffect(EFFECT_1).TriggerSpell });
+                SpellEffectInfo const* effect0 = spellInfo->GetEffect(EFFECT_0);
+                SpellEffectInfo const* effect1 = spellInfo->GetEffect(EFFECT_1);
+                return effect0 && effect1 && ValidateSpellInfo({ effect0->TriggerSpell, effect1->TriggerSpell });
             }
 
             void HandleProc(AuraEffect* aurEff, ProcEventInfo& eventInfo)
@@ -1122,7 +1116,7 @@ class spell_putricide_ooze_tank_protection : public SpellScriptLoader
                 PreventDefaultAction();
 
                 Unit* actionTarget = eventInfo.GetActionTarget();
-                actionTarget->CastSpell(nullptr, aurEff->GetSpellEffectInfo().TriggerSpell, aurEff);
+                actionTarget->CastSpell(nullptr, aurEff->GetSpellEffectInfo()->TriggerSpell, true, nullptr, aurEff);
             }
 
             void Register() override
@@ -1150,14 +1144,13 @@ class spell_putricide_choking_gas_bomb : public SpellScriptLoader
             void HandleScript(SpellEffIndex /*effIndex*/)
             {
                 uint32 skipIndex = urand(0, 2);
-                for (SpellEffectInfo const& spellEffectInfo : GetSpellInfo()->GetEffects())
+                for (SpellEffectInfo const* effect : GetSpellInfo()->GetEffects())
                 {
-                    if (spellEffectInfo.EffectIndex == skipIndex)
+                    if (!effect || effect->EffectIndex == skipIndex)
                         continue;
 
-                    uint32 spellId = uint32(spellEffectInfo.CalcValue());
-                    GetCaster()->CastSpell(GetCaster(), spellId, CastSpellExtraArgs(TRIGGERED_FULL_MASK)
-                        .SetOriginalCaster(GetCaster()->GetGUID()));
+                    uint32 spellId = uint32(effect->CalcValue());
+                    GetCaster()->CastSpell(GetCaster(), spellId, true, nullptr, nullptr, GetCaster()->GetGUID());
                 }
             }
 
@@ -1313,10 +1306,10 @@ class spell_putricide_mutated_plague : public SpellScriptLoader
                 if (!caster)
                     return;
 
-                uint32 triggerSpell = aurEff->GetSpellEffectInfo().TriggerSpell;
+                uint32 triggerSpell = GetSpellInfo()->GetEffect(aurEff->GetEffIndex())->TriggerSpell;
                 SpellInfo const* spell = sSpellMgr->AssertSpellInfo(triggerSpell, GetCastDifficulty());
 
-                int32 damage = spell->GetEffect(EFFECT_0).CalcValue(caster);
+                int32 damage = spell->GetEffect(EFFECT_0)->CalcValue(caster);
                 float multiplier = 2.0f;
                 if (GetTarget()->GetMap()->Is25ManRaid())
                     multiplier = 3.0f;
@@ -1324,25 +1317,19 @@ class spell_putricide_mutated_plague : public SpellScriptLoader
                 damage *= int32(pow(multiplier, GetStackAmount()));
                 damage = int32(damage * 1.5f);
 
-                CastSpellExtraArgs args(aurEff);
-                args.OriginalCaster = GetCasterGUID();
-                args.AddSpellBP0(damage);
-                GetTarget()->CastSpell(GetTarget(), triggerSpell, args);
+                GetTarget()->CastCustomSpell(triggerSpell, SPELLVALUE_BASE_POINT0, damage, GetTarget(), true, nullptr, aurEff, GetCasterGUID());
             }
 
-            void OnRemove(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
+            void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
             {
-                uint32 healSpell = uint32(aurEff->GetSpellEffectInfo().CalcValue());
+                uint32 healSpell = uint32(GetSpellInfo()->GetEffect(EFFECT_0)->CalcValue());
                 SpellInfo const* healSpellInfo = sSpellMgr->GetSpellInfo(healSpell, GetCastDifficulty());
 
                 if (!healSpellInfo)
                     return;
 
-                int32 heal = healSpellInfo->GetEffect(EFFECT_0).CalcValue() * GetStackAmount();
-                CastSpellExtraArgs args(TRIGGERED_FULL_MASK);
-                args.SetOriginalCaster(GetCasterGUID());
-                args.AddSpellBP0(heal);
-                GetTarget()->CastSpell(GetTarget(), healSpell, args);
+                int32 heal = healSpellInfo->GetEffect(EFFECT_0)->CalcValue() * GetStackAmount();
+                GetTarget()->CastCustomSpell(healSpell, SPELLVALUE_BASE_POINT0, heal, GetTarget(), true, nullptr, nullptr, GetCasterGUID());
             }
 
             void Register() override
@@ -1505,8 +1492,8 @@ class spell_putricide_mutated_transformation : public SpellScriptLoader
                     return;
                 }
 
-                uint32 entry = uint32(GetEffectInfo().MiscValue);
-                SummonPropertiesEntry const* properties = sSummonPropertiesStore.LookupEntry(uint32(GetEffectInfo().MiscValueB));
+                uint32 entry = uint32(GetSpellInfo()->GetEffect(effIndex)->MiscValue);
+                SummonPropertiesEntry const* properties = sSummonPropertiesStore.LookupEntry(uint32(GetSpellInfo()->GetEffect(effIndex)->MiscValueB));
                 uint32 duration = uint32(GetSpellInfo()->GetDuration());
 
                 Position pos = caster->GetPosition();

@@ -229,7 +229,7 @@ struct boss_shade_of_akama : public BossAI
         events.Reset();
         summons.DespawnAll();
 
-        for (ObjectGuid spawnerGuid : _spawners)
+        for (ObjectGuid const spawnerGuid : _spawners)
             if (Creature* spawner = ObjectAccessor::GetCreature(*me, spawnerGuid))
                 spawner->AI()->DoAction(ACTION_DESPAWN_ALL_SPAWNS);
 
@@ -261,7 +261,7 @@ struct boss_shade_of_akama : public BossAI
             me->SetWalk(false);
             events.ScheduleEvent(EVENT_ADD_THREAT, Milliseconds(100));
 
-            for (ObjectGuid spawnerGuid : _spawners)
+            for (ObjectGuid const spawnerGuid : _spawners)
                 if (Creature* spawner = ObjectAccessor::GetCreature(*me, spawnerGuid))
                     spawner->AI()->DoAction(ACTION_STOP_SPAWNING);
         }
@@ -274,7 +274,7 @@ struct boss_shade_of_akama : public BossAI
         if (Creature* akama = instance->GetCreature(DATA_AKAMA_SHADE))
             akama->AI()->DoAction(ACTION_SHADE_OF_AKAMA_DEAD);
 
-        for (ObjectGuid spawnerGuid : _spawners)
+        for (ObjectGuid const spawnerGuid : _spawners)
             if (Creature* spawner = ObjectAccessor::GetCreature(*me, spawnerGuid))
                 spawner->AI()->DoAction(ACTION_DESPAWN_ALL_SPAWNS);
 
@@ -288,7 +288,7 @@ struct boss_shade_of_akama : public BossAI
         Map::PlayerList const& players = me->GetMap()->GetPlayers();
         for (Map::PlayerList::const_iterator i = players.begin(); i != players.end(); ++i)
             if (Player* player = i->GetSource())
-                if (player->IsAlive() && !player->IsGameMaster() && IsInBoundary(player))
+                if (player->IsAlive() && !player->IsGameMaster() && CheckBoundary(player))
                     return;
 
         EnterEvadeMode(EVADE_REASON_NO_HOSTILES);
@@ -316,11 +316,11 @@ struct boss_shade_of_akama : public BossAI
                 }
                 case EVENT_START_CHANNELERS_AND_SPAWNERS:
                 {
-                    for (ObjectGuid summonGuid : summons)
+                    for (ObjectGuid const summonGuid : summons)
                         if (Creature* channeler = ObjectAccessor::GetCreature(*me, summonGuid))
                             channeler->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
 
-                    for (ObjectGuid spawnerGuid : _spawners)
+                    for (ObjectGuid const spawnerGuid : _spawners)
                         if (Creature* spawner = ObjectAccessor::GetCreature(*me, spawnerGuid))
                             spawner->AI()->DoAction(ACTION_START_SPAWNING);
 
@@ -708,7 +708,7 @@ struct npc_ashtongue_sorcerer : public ScriptedAI
     }
 
     void EnterEvadeMode(EvadeReason /*why*/) override { }
-    void JustEngagedWith(Unit* /*who*/) override { }
+    void EnterCombat(Unit* /*who*/) override { }
 
     void AttackStart(Unit* who) override
     {
@@ -724,7 +724,7 @@ struct npc_ashtongue_sorcerer : public ScriptedAI
         {
             _inBanish = true;
             me->StopMoving();
-            me->GetMotionMaster()->Clear();
+            me->GetMotionMaster()->Clear(false);
             me->GetMotionMaster()->MovePoint(1, me->GetPositionX() + frand(-8.0f, 8.0f), me->GetPositionY() + frand(-8.0f, 8.0f), me->GetPositionZ());
 
             _scheduler.Schedule(Seconds(1) + Milliseconds(500), [this](TaskContext sorcer_channel)
@@ -787,7 +787,7 @@ struct npc_ashtongue_defender : public ScriptedAI
         me->DespawnOrUnsummon(Seconds(5));
     }
 
-    void JustEngagedWith(Unit* /*who*/) override
+    void EnterCombat(Unit* /*who*/) override
     {
         _events.ScheduleEvent(EVENT_HEROIC_STRIKE, Seconds(5));
         _events.ScheduleEvent(EVENT_SHIELD_BASH, Seconds(10), Seconds(16));
@@ -854,7 +854,7 @@ struct npc_ashtongue_rogue : public ScriptedAI
         me->DespawnOrUnsummon(Seconds(5));
     }
 
-    void JustEngagedWith(Unit* /*who*/) override
+    void EnterCombat(Unit* /*who*/) override
     {
         _events.ScheduleEvent(EVENT_DEBILITATING_POISON, Milliseconds(500), Seconds(2));
         _events.ScheduleEvent(EVENT_EVISCERATE, Seconds(2), Seconds(5));
@@ -912,7 +912,7 @@ struct npc_ashtongue_elementalist : public ScriptedAI
         me->DespawnOrUnsummon(Seconds(5));
     }
 
-    void JustEngagedWith(Unit* /*who*/) override
+    void EnterCombat(Unit* /*who*/) override
     {
         _events.ScheduleEvent(EVENT_RAIN_OF_FIRE, Seconds(18));
         _events.ScheduleEvent(EVENT_LIGHTNING_BOLT, Seconds(6));
@@ -979,7 +979,7 @@ struct npc_ashtongue_spiritbinder : public ScriptedAI
         me->DespawnOrUnsummon(Seconds(5));
     }
 
-    void JustEngagedWith(Unit* /*who*/) override
+    void EnterCombat(Unit* /*who*/) override
     {
         _events.ScheduleEvent(EVENT_SPIRIT_HEAL, Seconds(5), Seconds(6));
     }

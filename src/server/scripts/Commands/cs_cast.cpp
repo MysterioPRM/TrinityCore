@@ -110,8 +110,8 @@ public:
 
     static bool HandleCastBackCommand(ChatHandler* handler, char const* args)
     {
-        Creature* caster = handler->getSelectedCreature();
-        if (!caster)
+        WorldObject* caster = handler->getSelectedObject();
+        if (!caster || !caster->IsUnit())
         {
             handler->SendSysMessage(LANG_SELECT_CHAR_OR_CREATURE);
             handler->SetSentErrorMessage(true);
@@ -135,7 +135,7 @@ public:
         }
 
         TriggerCastFlags triggered = (triggeredStr != nullptr) ? TRIGGERED_FULL_DEBUG_MASK : TRIGGERED_NONE;
-        caster->CastSpell(handler->GetSession()->GetPlayer(), spellId, triggered);
+        caster->ToUnit()->CastSpell(handler->GetSession()->GetPlayer(), spellId, triggered);
 
         return true;
     }
@@ -171,7 +171,8 @@ public:
         TriggerCastFlags triggered = (triggeredStr != nullptr) ? TRIGGERED_FULL_DEBUG_MASK : TRIGGERED_NONE;
         float x, y, z;
         handler->GetSession()->GetPlayer()->GetClosePoint(x, y, z, dist);
-        handler->GetSession()->GetPlayer()->CastSpell(Position{ x, y, z }, spellId, triggered);
+
+        handler->GetSession()->GetPlayer()->CastSpell(x, y, z, spellId, triggered);
 
         return true;
     }
@@ -260,7 +261,9 @@ public:
         if (!posX || !posY || !posZ)
             return false;
 
-        Position dest(atof(posX), atof(posY), atof(posZ));
+        float x = float(atof(posX));
+        float y = float(atof(posY));
+        float z = float(atof(posZ));
 
         char* triggeredStr = strtok(nullptr, " ");
         if (triggeredStr)
@@ -271,7 +274,7 @@ public:
         }
 
         TriggerCastFlags triggered = (triggeredStr != nullptr) ? TRIGGERED_FULL_DEBUG_MASK : TRIGGERED_NONE;
-        caster->CastSpell(dest, spellId, triggered);
+        caster->CastSpell(x, y, z, spellId, triggered);
 
         return true;
     }

@@ -84,7 +84,7 @@ public:
             me->SetFaction(FACTION_OGRE);
         }
 
-        void JustEngagedWith(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) override { }
 
         void DoNice()
         {
@@ -99,10 +99,9 @@ public:
 
         void DamageTaken(Unit* done_by, uint32 &damage) override
         {
-            if (!done_by || !me->HealthBelowPctDamaged(30, damage))
-                return;
+            Player* player = done_by->ToPlayer();
 
-            if (Player* player = done_by->ToPlayer())
+            if (player && me->HealthBelowPctDamaged(30, damage))
             {
                 if (Group* group = player->GetGroup())
                 {
@@ -199,7 +198,7 @@ public:
             }
         }
 
-        void JustEngagedWith(Unit* /*who*/) override { }
+        void EnterCombat(Unit* /*who*/) override { }
 
         void MoveInLineOfSight(Unit* who) override
 
@@ -318,9 +317,73 @@ public:
     }
 };
 
+/*########
+####npc_akuno
+#####*/
+
+enum Akuno
+{
+    QUEST_ESCAPING_THE_TOMB = 10887,
+    NPC_CABAL_SKRIMISHER    = 21661
+};
+
+class npc_akuno : public CreatureScript
+{
+public:
+    npc_akuno() : CreatureScript("npc_akuno") { }
+
+    struct npc_akunoAI : public EscortAI
+    {
+        npc_akunoAI(Creature* creature) : EscortAI(creature) { }
+
+        void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
+        {
+            Player* player = GetPlayerForEscort();
+            if (!player)
+                return;
+
+            switch (waypointId)
+            {
+                case 3:
+                    me->SummonCreature(NPC_CABAL_SKRIMISHER, -2795.99f, 5420.33f, -34.53f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
+                    me->SummonCreature(NPC_CABAL_SKRIMISHER, -2793.55f, 5412.79f, -34.53f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 25000);
+                    break;
+                case 11:
+                    if (player->GetTypeId() == TYPEID_PLAYER)
+                        player->GroupEventHappens(QUEST_ESCAPING_THE_TOMB, me);
+                    break;
+            }
+        }
+
+        void JustSummoned(Creature* summon) override
+        {
+            summon->AI()->AttackStart(me);
+        }
+
+        void QuestAccept(Player* player, Quest const* quest) override
+        {
+            if (quest->GetQuestId() == QUEST_ESCAPING_THE_TOMB)
+            {
+                Start(false, false, player->GetGUID());
+
+                if (player->GetTeamId() == TEAM_ALLIANCE)
+                    me->SetFaction(FACTION_ESCORTEE_A_NEUTRAL_PASSIVE);
+                else
+                    me->SetFaction(FACTION_ESCORTEE_H_NEUTRAL_PASSIVE);
+            }
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_akunoAI(creature);
+    }
+};
+
 void AddSC_terokkar_forest()
 {
     new npc_unkor_the_ruthless();
     new npc_isla_starmane();
     new npc_skywing();
+    new npc_akuno();
 }

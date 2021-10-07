@@ -23,7 +23,6 @@ SDCategory: Instance Script
 EndScriptData */
 
 #include "ScriptMgr.h"
-#include "Containers.h"
 #include "MotionMaster.h"
 #include "oculus.h"
 #include "ScriptedCreature.h"
@@ -103,7 +102,7 @@ class boss_urom : public CreatureScript
                 for (uint8 i = 0; i < 3; ++i)
                     group[i] = i;
 
-                Trinity::Containers::RandomShuffle(group);
+                std::random_shuffle(group, group + 3);
             }
 
             void Initialize()
@@ -129,9 +128,9 @@ class boss_urom : public CreatureScript
                 me->GetMotionMaster()->MoveIdle();
             }
 
-            void JustEngagedWith(Unit* /*who*/) override
+            void EnterCombat(Unit* /*who*/) override
             {
-                _JustEngagedWith();
+                _EnterCombat();
 
                 StartAttack();
             }

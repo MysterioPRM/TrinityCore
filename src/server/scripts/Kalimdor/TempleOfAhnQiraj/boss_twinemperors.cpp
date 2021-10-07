@@ -149,7 +149,7 @@ struct boss_twinemperorsAI : public ScriptedAI
         DoPlaySoundToSet(me, IAmVeklor() ? SOUND_VL_KILL : SOUND_VN_KILL);
     }
 
-    void JustEngagedWith(Unit* who) override
+    void EnterCombat(Unit* who) override
     {
         DoZoneInCombat();
         Creature* pOtherBoss = GetOtherBoss();
@@ -222,7 +222,7 @@ struct boss_twinemperorsAI : public ScriptedAI
         Creature* pOtherBoss = GetOtherBoss();
         if (pOtherBoss)
         {
-            //me->MonsterYell("Teleporting ...", LANG_UNIVERSAL, 0);
+            //me->Yell("Teleporting ...", LANG_UNIVERSAL, 0);
             Position thisPos;
             thisPos.Relocate(me);
             Position otherPos;
@@ -332,7 +332,7 @@ struct boss_twinemperorsAI : public ScriptedAI
                 if (c->isDead())
                 {
                     c->Respawn();
-                    c->SetFaction(FACTION_CREATURE);
+                    c->SetFaction(7);
                     c->RemoveAllAuras();
                 }
                 if (c->IsWithinDistInMap(me, ABUSE_BUG_RANGE))
@@ -522,7 +522,7 @@ public:
 
         void CastSpellOnBug(Creature* target) override
         {
-            target->SetFaction(FACTION_MONSTER);
+            target->SetFaction(14);
             target->AddAura(SPELL_EXPLODEBUG, target);
             target->SetFullHealth();
         }
@@ -545,7 +545,7 @@ public:
             if (ShadowBolt_Timer <= diff)
             {
                 if (!me->IsWithinDist(me->GetVictim(), 45.0f))
-                    me->GetMotionMaster()->MoveChase(me->GetVictim(), VEKLOR_DIST);
+                    me->GetMotionMaster()->MoveChase(me->GetVictim(), VEKLOR_DIST, 0);
                 else
                     DoCastVictim(SPELL_SHADOWBOLT);
                 ShadowBolt_Timer = 2000;
@@ -595,7 +595,7 @@ public:
                 // VL doesn't melee
                 if (me->Attack(who, false))
                 {
-                    me->GetMotionMaster()->MoveChase(who, VEKLOR_DIST);
+                    me->GetMotionMaster()->MoveChase(who, VEKLOR_DIST, 0);
                     AddThreat(who, 0.0f);
                 }
             }

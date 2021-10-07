@@ -49,41 +49,31 @@ class npc_nat_pagle : public CreatureScript
 public:
     npc_nat_pagle() : CreatureScript("npc_nat_pagle") { }
 
-    struct npc_nat_pagleAI : public ScriptedAI
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     {
-        npc_nat_pagleAI(Creature* creature) : ScriptedAI(creature) { }
+        ClearGossipMenuFor(player);
+        if (action == GOSSIP_ACTION_TRADE)
+            player->GetSession()->SendListInventory(creature->GetGUID());
 
-        bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
-        {
-            uint32 const action = player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
-            ClearGossipMenuFor(player);
-            if (action == GOSSIP_ACTION_TRADE)
-                player->GetSession()->SendListInventory(me->GetGUID());
-
-            return true;
-        }
-
-        bool GossipHello(Player* player) override
-        {
-            if (me->IsQuestGiver())
-                player->PrepareQuestMenu(me->GetGUID());
-
-            if (me->IsVendor() && player->GetQuestRewardStatus(QUEST_NATS_MEASURING_TAPE))
-            {
-                AddGossipItemFor(player, GossipOptionIcon::Vendor, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
-                SendGossipMenuFor(player, 7640, me->GetGUID());
-            }
-            else
-                SendGossipMenuFor(player, 7638, me->GetGUID());
-
-            return true;
-        }
-    };
-
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new npc_nat_pagleAI(creature);
+        return true;
     }
+
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        if (creature->IsQuestGiver())
+            player->PrepareQuestMenu(creature->GetGUID());
+
+        if (creature->IsVendor() && player->GetQuestRewardStatus(QUEST_NATS_MEASURING_TAPE))
+        {
+            AddGossipItemFor(player, GOSSIP_ICON_VENDOR, GOSSIP_TEXT_BROWSE_GOODS, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_TRADE);
+            SendGossipMenuFor(player, 7640, creature->GetGUID());
+        }
+        else
+            SendGossipMenuFor(player, 7638, creature->GetGUID());
+
+        return true;
+    }
+
 };
 
 /*######
@@ -99,6 +89,7 @@ enum Hendel
     EMOTE_SURRENDER             = 4,
 
     QUEST_MISSING_DIPLO_PT16    = 1324,
+    FACTION_HOSTILE             = 168,                      //guessed, may be different
 
     NPC_SENTRY                  = 5184,                     //helps hendel
     NPC_JAINA                   = 4968,                     //appears once hendel gives up
@@ -111,6 +102,19 @@ class npc_private_hendel : public CreatureScript
 public:
     npc_private_hendel() : CreatureScript("npc_private_hendel") { }
 
+    bool OnQuestAccept(Player* /*player*/, Creature* creature, const Quest* quest) override
+    {
+        if (quest->GetQuestId() == QUEST_MISSING_DIPLO_PT16)
+            creature->SetFaction(FACTION_HOSTILE);
+
+        return true;
+    }
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_private_hendelAI(creature);
+    }
+
     struct npc_private_hendelAI : public ScriptedAI
     {
         npc_private_hendelAI(Creature* creature) : ScriptedAI(creature) { }
@@ -120,32 +124,32 @@ public:
             me->RestoreFaction();
         }
 
+        void AttackedBy(Unit* pAttacker) override
+        {
+            if (me->GetVictim())
+                return;
+
+            if (me->IsFriendlyTo(pAttacker))
+                return;
+
+            AttackStart(pAttacker);
+        }
+
         void DamageTaken(Unit* pDoneBy, uint32 &Damage) override
         {
             if (Damage > me->GetHealth() || me->HealthBelowPctDamaged(20, Damage))
             {
                 Damage = 0;
 
-                if (pDoneBy)
-                    if (Player* player = pDoneBy->GetCharmerOrOwnerPlayerOrPlayerItself())
-                        player->GroupEventHappens(QUEST_MISSING_DIPLO_PT16, me);
+                if (Player* player = pDoneBy->GetCharmerOrOwnerPlayerOrPlayerItself())
+                    player->GroupEventHappens(QUEST_MISSING_DIPLO_PT16, me);
 
                 Talk(EMOTE_SURRENDER);
                 EnterEvadeMode();
             }
         }
-
-        void QuestAccept(Player* /*player*/, Quest const* quest) override
-        {
-            if (quest->GetQuestId() == QUEST_MISSING_DIPLO_PT16)
-                me->SetFaction(FACTION_ENEMY);
-        }
     };
 
-    CreatureAI* GetAI(Creature* creature) const override
-    {
-        return new npc_private_hendelAI(creature);
-    }
 };
 
 /*######
@@ -242,14 +246,14 @@ class spell_ooze_zap : public SpellScriptLoader
         {
             PrepareSpellScript(spell_ooze_zap_SpellScript);
 
-            bool Validate(SpellInfo const* spellInfo) override
+            bool Validate(SpellInfo const* /*spellInfo*/) override
             {
-                return spellInfo->GetEffects().size() > EFFECT_1 && ValidateSpellInfo({ SPELL_OOZE_ZAP });
+                return ValidateSpellInfo({ SPELL_OOZE_ZAP });
             }
 
             SpellCastResult CheckRequirement()
             {
-                if (!GetCaster()->HasAura(GetEffectInfo(EFFECT_1).CalcValue()))
+                if (!GetCaster()->HasAura(GetSpellInfo()->GetEffect(EFFECT_1)->CalcValue()))
                     return SPELL_FAILED_CANT_DO_THAT_RIGHT_NOW; // This is actually correct
 
                 if (!GetExplTargetUnit())
@@ -330,7 +334,7 @@ class spell_energize_aoe : public SpellScriptLoader
             {
                 for (std::list<WorldObject*>::iterator itr = targets.begin(); itr != targets.end();)
                 {
-                    if ((*itr)->GetTypeId() == TYPEID_PLAYER && (*itr)->ToPlayer()->GetQuestStatus(GetEffectInfo(EFFECT_1).CalcValue()) == QUEST_STATUS_INCOMPLETE)
+                    if ((*itr)->GetTypeId() == TYPEID_PLAYER && (*itr)->ToPlayer()->GetQuestStatus(GetSpellInfo()->GetEffect(EFFECT_1)->CalcValue()) == QUEST_STATUS_INCOMPLETE)
                         ++itr;
                     else
                         targets.erase(itr++);

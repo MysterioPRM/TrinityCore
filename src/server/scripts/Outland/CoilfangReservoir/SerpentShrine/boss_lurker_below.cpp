@@ -167,7 +167,7 @@ public:
             Summons.DespawnAll();
         }
 
-        void JustEngagedWith(Unit* /*who*/) override
+        void EnterCombat(Unit* /*who*/) override
         {
             instance->SetData(DATA_THELURKERBELOWEVENT, IN_PROGRESS);
         }
@@ -248,7 +248,7 @@ public:
                 {
                     Talk(EMOTE_SPOUT);
                     me->SetReactState(REACT_PASSIVE);
-                    me->GetMotionMaster()->MoveRotate(0, 20000, urand(0, 1) ? ROTATE_DIRECTION_LEFT : ROTATE_DIRECTION_RIGHT);
+                    me->GetMotionMaster()->MoveRotate(20000, urand(0, 1) ? ROTATE_DIRECTION_LEFT : ROTATE_DIRECTION_RIGHT);
                     SpoutTimer = 45000;
                     WhirlTimer = 20000; // whirl directly after spout
                     RotTimer = 20000;
@@ -266,7 +266,7 @@ public:
                 else
                     WhirlTimer -= diff;
 
-                if (CheckTimer <= diff) // check if there are players in melee range
+                if (CheckTimer <= diff)//check if there are players in melee range
                 {
                     InRange = false;
                     Map::PlayerList const& PlayerList = me->GetMap()->GetPlayers();
@@ -436,8 +436,9 @@ public:
 
             if (ShootBowTimer <= diff)
             {
+                int bp0 = 1100;
                 if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0))
-                    me->CastSpell(target, SPELL_SHOOT, CastSpellExtraArgs(TRIGGERED_FULL_MASK).AddSpellBP0(1100));
+                    me->CastCustomSpell(target, SPELL_SHOOT, &bp0, nullptr, nullptr, true);
                 ShootBowTimer = 4000 + rand32() % 5000;
                 MultiShotTimer += 1500; // add global cooldown
             } else ShootBowTimer -= diff;

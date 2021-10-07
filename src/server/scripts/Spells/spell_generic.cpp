@@ -52,7 +52,7 @@ class spell_gen_absorb0_hitlimit1 : public AuraScript
     bool Load() override
     {
         // Max absorb stored in 1 dummy effect
-        limit = GetSpellInfo()->GetEffect(EFFECT_1).CalcValue();
+        limit = GetSpellInfo()->GetEffect(EFFECT_1)->CalcValue();
         return true;
     }
 
@@ -229,7 +229,7 @@ class spell_gen_arena_drink : public AuraScript
 
     bool Validate(SpellInfo const* spellInfo) override
     {
-        if (spellInfo->GetEffects().empty() || !spellInfo->GetEffect(EFFECT_0).IsAura(SPELL_AURA_MOD_POWER_REGEN))
+        if (!spellInfo->GetEffect(EFFECT_0)->IsAura() || spellInfo->GetEffect(EFFECT_0)->ApplyAuraName != SPELL_AURA_MOD_POWER_REGEN)
         {
             TC_LOG_ERROR("spells", "Aura %d structure has been changed - first aura is no longer SPELL_AURA_MOD_POWER_REGEN", GetId());
             return false;
@@ -328,7 +328,7 @@ class spell_gen_aura_of_fear : public AuraScript
 
     bool Validate(SpellInfo const* spellInfo) override
     {
-        return !spellInfo->GetEffects().empty() && ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_0).TriggerSpell });
+        return ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_0)->TriggerSpell });
     }
 
     void PeriodicTick(AuraEffect const* aurEff)
@@ -337,7 +337,7 @@ class spell_gen_aura_of_fear : public AuraScript
         if (!roll_chance_i(GetSpellInfo()->ProcChance))
             return;
 
-        GetTarget()->CastSpell(nullptr, aurEff->GetSpellEffectInfo().TriggerSpell, true);
+        GetTarget()->CastSpell(nullptr, GetSpellInfo()->GetEffect(aurEff->GetEffIndex())->TriggerSpell, true);
     }
 
     void Register() override
@@ -676,18 +676,18 @@ class spell_gen_burning_depths_necrolyte_image : public AuraScript
 
     bool Validate(SpellInfo const* spellInfo) override
     {
-        return spellInfo->GetEffects().size() > EFFECT_2 && ValidateSpellInfo({ static_cast<uint32>(spellInfo->GetEffect(EFFECT_2).CalcValue()) });
+        return ValidateSpellInfo({ static_cast<uint32>(spellInfo->GetEffect(EFFECT_2)->CalcValue()) });
     }
 
     void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         if (Unit* caster = GetCaster())
-            caster->CastSpell(GetTarget(), uint32(GetEffectInfo(EFFECT_2).CalcValue()));
+            caster->CastSpell(GetTarget(), uint32(GetSpellInfo()->GetEffect(EFFECT_2)->CalcValue()));
     }
 
     void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
-        GetTarget()->RemoveAurasDueToSpell(uint32(GetEffectInfo(EFFECT_2).CalcValue()), GetCasterGUID());
+        GetTarget()->RemoveAurasDueToSpell(uint32(GetSpellInfo()->GetEffect(EFFECT_2)->CalcValue()), GetCasterGUID());
     }
 
     void Register() override
@@ -1344,7 +1344,7 @@ class spell_gen_despawn_self : public SpellScript
 
     void HandleDummy(SpellEffIndex /*effIndex*/)
     {
-        if (GetEffectInfo().IsEffect(SPELL_EFFECT_DUMMY) || GetEffectInfo().IsEffect(SPELL_EFFECT_SCRIPT_EFFECT))
+        if (GetEffectInfo()->IsEffect(SPELL_EFFECT_DUMMY) || GetEffectInfo()->IsEffect(SPELL_EFFECT_SCRIPT_EFFECT))
             GetCaster()->ToCreature()->DespawnOrUnsummon();
     }
 
@@ -1594,20 +1594,18 @@ class spell_gen_gift_of_naaru : public AuraScript
 {
     PrepareAuraScript(spell_gen_gift_of_naaru);
 
-    bool Validate(SpellInfo const* spellInfo) override
-    {
-        return spellInfo->GetEffects().size() > EFFECT_1;
-    }
-
     void CalculateAmount(AuraEffect const* aurEff, int32& amount, bool& /*canBeRecalculated*/)
     {
         if (!GetCaster() || !aurEff->GetTotalTicks())
             return;
 
-        float healPct = GetEffectInfo(EFFECT_1).CalcValue() / 100.0f;
-        float heal = healPct * GetCaster()->GetMaxHealth();
-        int32 healTick = std::floor(heal / aurEff->GetTotalTicks());
-        amount += healTick;
+        if (SpellEffectInfo const* eff1 = GetSpellInfo()->GetEffect(EFFECT_1))
+        {
+            float healPct = eff1->CalcValue() / 100.0f;
+            float heal = healPct * GetCaster()->GetMaxHealth();
+            int32 healTick = std::floor(heal / aurEff->GetTotalTicks());
+            amount += healTick;
+        }
     }
 
     void Register() override
@@ -1737,8 +1735,7 @@ class spell_gen_lifebloom : public SpellScriptLoader
                     return;
 
                 // final heal
-                GetTarget()->CastSpell(GetTarget(), _spellId, CastSpellExtraArgs(aurEff)
-                    .SetOriginalCaster(GetCasterGUID()));
+                GetTarget()->CastSpell(GetTarget(), _spellId, { aurEff, GetCasterGUID() });
             }
 
             void Register() override
@@ -1909,7 +1906,7 @@ class spell_gen_mounted_charge : public SpellScript
         if (spell->HasEffect(SPELL_EFFECT_SCRIPT_EFFECT))
             OnEffectHitTarget += SpellEffectFn(spell_gen_mounted_charge::HandleScriptEffect, EFFECT_FIRST_FOUND, SPELL_EFFECT_SCRIPT_EFFECT);
 
-        if (spell->GetEffect(EFFECT_0).IsEffect(SPELL_EFFECT_CHARGE))
+        if (spell->GetEffect(EFFECT_0)->Effect == SPELL_EFFECT_CHARGE)
             OnEffectHitTarget += SpellEffectFn(spell_gen_mounted_charge::HandleChargeEffect, EFFECT_0, SPELL_EFFECT_CHARGE);
     }
 };
@@ -1949,7 +1946,7 @@ class spell_gen_negative_energy_periodic : public AuraScript
 
     bool Validate(SpellInfo const* spellInfo) override
     {
-        return !spellInfo->GetEffects().empty() && ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_0).TriggerSpell });
+        return ValidateSpellInfo({ spellInfo->GetEffect(EFFECT_0)->TriggerSpell });
     }
 
     void PeriodicTick(AuraEffect const* aurEff)
@@ -1958,7 +1955,7 @@ class spell_gen_negative_energy_periodic : public AuraScript
 
         CastSpellExtraArgs args(aurEff);
         args.AddSpellMod(SPELLVALUE_MAX_TARGETS, aurEff->GetTickNumber() / 10 + 1);
-        GetTarget()->CastSpell(nullptr, aurEff->GetSpellEffectInfo().TriggerSpell, args);
+        GetTarget()->CastSpell(nullptr, GetSpellInfo()->GetEffect(aurEff->GetEffIndex())->TriggerSpell, args);
     }
 
     void Register() override
@@ -2150,21 +2147,16 @@ class spell_gen_oracle_wolvar_reputation : public SpellScript
 {
     PrepareSpellScript(spell_gen_oracle_wolvar_reputation);
 
-    bool Validate(SpellInfo const* spellInfo) override
-    {
-        return spellInfo->GetEffects().size() > EFFECT_1;
-    }
-
     bool Load() override
     {
         return GetCaster()->GetTypeId() == TYPEID_PLAYER;
     }
 
-    void HandleDummy(SpellEffIndex /*effIndex*/)
+    void HandleDummy(SpellEffIndex effIndex)
     {
         Player* player = GetCaster()->ToPlayer();
-        uint32 factionId = GetEffectInfo().CalcValue();
-        int32  repChange = GetEffectInfo(EFFECT_1).CalcValue();
+        uint32 factionId = GetEffectInfo(effIndex)->CalcValue();
+        int32  repChange = GetEffectInfo(EFFECT_1)->CalcValue();
 
         FactionEntry const* factionEntry = sFactionStore.LookupEntry(factionId);
         if (!factionEntry)
@@ -2268,7 +2260,7 @@ class spell_gen_proc_below_pct_damaged : public SpellScriptLoader
                 if (!damageInfo || !damageInfo->GetDamage())
                     return false;
 
-                int32 pct = GetSpellInfo()->GetEffect(EFFECT_0).CalcValue();
+                int32 pct = GetSpellInfo()->GetEffect(EFFECT_0)->CalcValue();
 
                 if (eventInfo.GetActionTarget()->HealthBelowPctDamaged(pct, damageInfo->GetDamage()))
                     return true;
@@ -2521,16 +2513,11 @@ class spell_gen_remove_on_health_pct : public AuraScript
 {
     PrepareAuraScript(spell_gen_remove_on_health_pct);
 
-    bool Validate(SpellInfo const* spellInfo) override
-    {
-        return spellInfo->GetEffects().size() > EFFECT_1;
-    }
-
     void PeriodicTick(AuraEffect const* /*aurEff*/)
     {
         // they apply damage so no need to check for ticks here
 
-        if (GetTarget()->HealthAbovePct(GetEffectInfo(EFFECT_1).CalcValue()))
+        if (GetTarget()->HealthAbovePct(GetSpellInfo()->GetEffect(EFFECT_1)->CalcValue()))
         {
             Remove(AURA_REMOVE_BY_ENEMY_SPELL);
             PreventDefaultAction();
@@ -2555,7 +2542,7 @@ class spell_gen_remove_on_full_health : public AuraScript
     void PeriodicTick(AuraEffect const* aurEff)
     {
         // if it has only periodic effect, allow 1 tick
-        bool onlyEffect = GetSpellInfo()->GetEffects().size() == 1;
+        bool onlyEffect = (GetSpellInfo()->GetEffects().size() == 1);
         if (onlyEffect && aurEff->GetTickNumber() <= 1)
             return;
 
@@ -2803,15 +2790,17 @@ class spell_gen_seaforium_blast : public SpellScript
 
     bool Load() override
     {
-        return GetGObjCaster()->GetOwnerGUID().IsPlayer();
+        // OriginalCaster is always available in Spell::prepare
+        return GetOriginalCaster()->GetTypeId() == TYPEID_PLAYER;
     }
 
     void AchievementCredit(SpellEffIndex /*effIndex*/)
     {
-        if (Unit* owner = GetGObjCaster()->GetOwner())
+        // but in effect handling OriginalCaster can become nullptr
+        if (Unit* originalCaster = GetOriginalCaster())
             if (GameObject* go = GetHitGObj())
                 if (go->GetGOInfo()->type == GAMEOBJECT_TYPE_DESTRUCTIBLE_BUILDING)
-                    owner->CastSpell(nullptr, SPELL_PLANT_CHARGES_CREDIT_ACHIEVEMENT, true);
+                    originalCaster->CastSpell(originalCaster, SPELL_PLANT_CHARGES_CREDIT_ACHIEVEMENT, true);
     }
 
     void Register() override
@@ -3162,8 +3151,7 @@ class spell_gen_turkey_marker : public AuraScript
 
         // on stack 15 cast the achievement crediting spell
         if (GetStackAmount() >= 15)
-            target->CastSpell(target, SPELL_TURKEY_VENGEANCE, CastSpellExtraArgs(aurEff)
-                .SetOriginalCaster(GetCasterGUID()));
+            target->CastSpell(target, SPELL_TURKEY_VENGEANCE, { aurEff, GetCasterGUID() });
     }
 
     void OnPeriodic(AuraEffect const* /*aurEff*/)
@@ -3198,7 +3186,7 @@ class spell_gen_upper_deck_create_foam_sword : public SpellScript
 {
     PrepareSpellScript(spell_gen_upper_deck_create_foam_sword);
 
-    void HandleScript(SpellEffIndex /*effIndex*/)
+    void HandleScript(SpellEffIndex effIndex)
     {
         if (Player* player = GetHitPlayer())
         {
@@ -3210,7 +3198,7 @@ class spell_gen_upper_deck_create_foam_sword : public SpellScript
                     return;
             }
 
-            CreateItem(itemId[urand(0, 4)], ItemContext::NONE);
+            CreateItem(effIndex, itemId[urand(0, 4)], ItemContext::NONE);
         }
     }
 
@@ -3391,9 +3379,8 @@ class spell_gen_eject_passenger : public SpellScript
 
     bool Validate(SpellInfo const* spellInfo) override
     {
-        if (spellInfo->GetEffects().empty())
-            return false;
-        if (spellInfo->GetEffect(EFFECT_0).CalcValue() < 1)
+        SpellEffectInfo const* effect = spellInfo->GetEffect(EFFECT_0);
+        if (!effect || effect->CalcValue() < 1)
             return false;
         return true;
     }
@@ -3585,9 +3572,9 @@ class spell_gen_mixology_bonus : public AuraScript
 {
     PrepareAuraScript(spell_gen_mixology_bonus);
 
-    bool Validate(SpellInfo const* spellInfo) override
+    bool Validate(SpellInfo const* /*spellInfo*/) override
     {
-        return ValidateSpellInfo({ SPELL_MIXOLOGY }) && !spellInfo->GetEffects().empty();
+        return ValidateSpellInfo({ SPELL_MIXOLOGY });
     }
 
     bool Load() override
@@ -3603,7 +3590,7 @@ class spell_gen_mixology_bonus : public AuraScript
 
     void CalculateAmount(AuraEffect const* aurEff, int32& amount, bool& /*canBeRecalculated*/)
     {
-        if (GetCaster()->HasAura(SPELL_MIXOLOGY) && GetCaster()->HasSpell(GetEffectInfo(EFFECT_0).TriggerSpell))
+        if (GetCaster()->HasAura(SPELL_MIXOLOGY) && GetCaster()->HasSpell(GetSpellInfo()->GetEffect(EFFECT_0)->TriggerSpell))
         {
             switch (GetId())
             {
@@ -3986,14 +3973,14 @@ class spell_gen_face_rage : public AuraScript
 {
     PrepareAuraScript(spell_gen_face_rage);
 
-    bool Validate(SpellInfo const* spellInfo) override
+    bool Validate(SpellInfo const* /*spell*/) override
     {
-        return ValidateSpellInfo({ SPELL_FACE_RAGE }) && spellInfo->GetEffects().size() > EFFECT_2;
+        return ValidateSpellInfo({ SPELL_FACE_RAGE });
     }
 
     void OnRemove(AuraEffect const* /*effect*/, AuraEffectHandleModes /*mode*/)
     {
-        GetTarget()->RemoveAurasDueToSpell(GetEffectInfo(EFFECT_2).TriggerSpell);
+        GetTarget()->RemoveAurasDueToSpell(GetSpellInfo()->GetEffect(EFFECT_2)->TriggerSpell);
     }
 
     void Register() override
@@ -4014,7 +4001,7 @@ class spell_gen_impatient_mind : public AuraScript
 
     void OnRemove(AuraEffect const* effect, AuraEffectHandleModes /*mode*/)
     {
-        GetTarget()->RemoveAurasDueToSpell(effect->GetSpellEffectInfo().TriggerSpell);
+        GetTarget()->RemoveAurasDueToSpell(effect->GetSpellEffectInfo()->TriggerSpell);
     }
 
     void Register() override
